@@ -1,15 +1,13 @@
-# AI-Assisted EDA/AAP Routing Demo
+# EDA/AAP Request Routing
 
-Small proof-of-concept project that demonstrates AI-assisted routing of mock operational requests into Event-Driven Ansible/AAP-style workflows.
-
-This is a local, safe, synthetic demo. It does not integrate with ServiceNow, real Ansible Automation Platform, real Event-Driven Ansible, or real infrastructure.
+A local Python project for routing operational request payloads into Event-Driven Ansible/AAP-style workflows.
 
 ## Architecture
 
 ```text
 +------------------+      +----------------------+      +----------------------+
 | Mock ticket JSON | ---> | Request classifier   | ---> | Structured intent    |
-|                  |      | rule or OpenAI       |      | intent/action/etc.   |
+|                  |      | rule or OpenAI       |      | intent/action        |
 +------------------+      +----------------------+      +----------+-----------+
                                                                  |
                                                                  v
@@ -19,7 +17,7 @@ This is a local, safe, synthetic demo. It does not integrate with ServiceNow, re
 +------------------+      +----------------------+      +----------------------+
 ```
 
-The code is intentionally small and interview-demo friendly:
+Project layout:
 
 - `eda_aap_demo/classifiers.py` contains the classifier abstraction and deterministic rule-based classifier.
 - `eda_aap_demo/openai_classifier.py` contains an optional OpenAI-backed classifier.
@@ -29,26 +27,26 @@ The code is intentionally small and interview-demo friendly:
 - `eda_aap_demo/cli.py` provides the command-line entry point.
 - `tests/` covers classification and routing behavior.
 
-## Conceptual Mapping
+## Platform Mapping
 
-In a real platform, a ServiceNow ticket or service request could emit an event containing request details. Event-Driven Ansible would evaluate rulebooks against that event, select an automation target, and invoke an AAP job template or workflow.
+In a platform implementation, a ServiceNow ticket or service request can emit an event containing request details. Event-Driven Ansible evaluates rulebooks against that event, selects an automation target, and invokes an AAP job template or workflow.
 
-This demo maps those ideas as follows:
+This project uses the following local equivalents:
 
-| Real-world concept | Demo component |
+| Real-world concept | Local component |
 | --- | --- |
 | ServiceNow ticket | Mock JSON payload |
-| AI/NLP request understanding | Rule-based or OpenAI-backed classifier |
+| Request classification | Rule-based or OpenAI-backed classifier |
 | Structured operational intent | `ClassifiedIntent` |
 | EDA rulebook routing | `EdaRouter` |
 | AAP workflow/job template | Mock workflow handlers |
 | Job output | JSON result printed by CLI |
 
-## Run The Demo
+## Run Locally
 
 Requires Python 3.10+.
 
-Run locally with the default deterministic classifier:
+Run with the default deterministic classifier:
 
 ```bash
 python -m eda_aap_demo samples/restart_service.json
@@ -149,9 +147,9 @@ make security
 make test
 ```
 
-## What Is Mocked
+## Local Boundaries
 
-Everything operational is mocked:
+External systems and infrastructure actions are not called:
 
 - Ticket source is local JSON, not ServiceNow.
 - Default classification is deterministic keyword matching.
@@ -160,9 +158,9 @@ Everything operational is mocked:
 - AAP workflow execution only returns simulated steps.
 - No inventory, playbooks, job templates, or infrastructure actions are used.
 
-## Productionisation Considerations
+## Production Considerations
 
-To turn this concept into a production design, you would need:
+For a production implementation, add:
 
 - A real event source such as ServiceNow webhooks or an integration middleware.
 - Authentication, authorization, audit logging, and approval gates.
@@ -177,4 +175,4 @@ To turn this concept into a production design, you would need:
 
 `RequestClassifier` is the shared interface for both classifier implementations. `OpenAIClassifier` uses the OpenAI Responses API with Structured Outputs so the model response is constrained to the same structured intent fields used by the rest of the pipeline.
 
-The OpenAI classifier still only routes into mocked workflows. It does not call ServiceNow, EDA, AAP, or infrastructure.
+The OpenAI classifier only selects structured intent for the local workflow router. It does not call ServiceNow, EDA, AAP, or infrastructure.
