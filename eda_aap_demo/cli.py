@@ -25,15 +25,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--classifier",
         choices=("rule", "openai"),
-        default=os.getenv("AAP_EDA_CLASSIFIER", "rule"),
-        help="Classifier implementation to use. Defaults to AAP_EDA_CLASSIFIER or 'rule'.",
+        default=os.getenv("AAP_EDA_CLASSIFIER", "openai"),
+        help="Classifier implementation to use. Defaults to AAP_EDA_CLASSIFIER or 'openai'.",
     )
     parser.add_argument(
         "--model",
         default=os.getenv("OPENAI_MODEL"),
-        help=(
-            "OpenAI model to use with --classifier openai. Defaults to OPENAI_MODEL or gpt-5-mini."
-        ),
+        help=("OpenAI model to use. Defaults to OPENAI_MODEL or gpt-5-mini."),
     )
     args = parser.parse_args(argv)
 

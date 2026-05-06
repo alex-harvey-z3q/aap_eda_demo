@@ -7,7 +7,7 @@ A local Python project for routing operational request payloads into Event-Drive
 ```text
 +------------------+      +----------------------+      +----------------------+
 | Mock ticket JSON | ---> | Request classifier   | ---> | Structured intent    |
-|                  |      | rule or OpenAI       |      | intent/action        |
+|                  |      | OpenAI classifier    |      | intent/action        |
 +------------------+      +----------------------+      +----------+-----------+
                                                                  |
                                                                  v
@@ -19,8 +19,8 @@ A local Python project for routing operational request payloads into Event-Drive
 
 Project layout:
 
-- `eda_aap_demo/classifiers.py` contains the classifier abstraction and deterministic rule-based classifier.
-- `eda_aap_demo/openai_classifier.py` contains an optional OpenAI-backed classifier.
+- `eda_aap_demo/classifiers.py` contains the classifier abstraction and deterministic rule-based fallback.
+- `eda_aap_demo/openai_classifier.py` contains the OpenAI-backed classifier used by the CLI.
 - `eda_aap_demo/router.py` contains EDA-style routing rules.
 - `eda_aap_demo/workflows.py` contains mock AAP workflow handlers.
 - `eda_aap_demo/pipeline.py` wires the flow together.
@@ -36,7 +36,7 @@ This project uses the following local equivalents:
 | Real-world concept | Local component |
 | --- | --- |
 | ServiceNow ticket | Mock JSON payload |
-| Request classification | Rule-based or OpenAI-backed classifier |
+| Request classification | OpenAI-backed classifier |
 | Structured operational intent | `ClassifiedIntent` |
 | EDA rulebook routing | `EdaRouter` |
 | AAP workflow/job template | Mock workflow handlers |
@@ -46,7 +46,14 @@ This project uses the following local equivalents:
 
 Requires Python 3.10+.
 
-Run with the default deterministic classifier:
+Install dependencies and set an OpenAI API key:
+
+```bash
+python -m pip install -r requirements.txt
+export OPENAI_API_KEY="your-api-key"
+```
+
+Run with the included sample payload:
 
 ```bash
 python -m eda_aap_demo samples/restart_service.json
@@ -66,36 +73,24 @@ printf '%s\n' '{
 }' | python -m eda_aap_demo
 ```
 
-## Run With OpenAI Classification
-
-Install the optional dependency:
-
-```bash
-python -m pip install -r requirements.txt
-```
-
-Set your API key:
-
-```bash
-export OPENAI_API_KEY="your-api-key"
-```
-
-Run the same payload through the OpenAI-backed classifier:
-
-```bash
-python -m eda_aap_demo --classifier openai samples/restart_service.json
-```
+## Model Selection
 
 The default OpenAI model is `gpt-5-mini`. Override it with either:
 
 ```bash
-OPENAI_MODEL=gpt-5.2 python -m eda_aap_demo --classifier openai samples/restart_service.json
+OPENAI_MODEL=gpt-5.2 python -m eda_aap_demo samples/restart_service.json
 ```
 
 or:
 
 ```bash
-python -m eda_aap_demo --classifier openai --model gpt-5.2 samples/restart_service.json
+python -m eda_aap_demo --model gpt-5.2 samples/restart_service.json
+```
+
+For offline development, the deterministic classifier can still be selected explicitly:
+
+```bash
+python -m eda_aap_demo --classifier rule samples/restart_service.json
 ```
 
 Example output:
@@ -152,8 +147,8 @@ make test
 External systems and infrastructure actions are not called:
 
 - Ticket source is local JSON, not ServiceNow.
-- Default classification is deterministic keyword matching.
-- OpenAI classification is optional and only runs when `--classifier openai` is selected.
+- Request classification uses OpenAI by default.
+- The deterministic rule classifier is available for offline development with `--classifier rule`.
 - EDA routing is plain Python rules, not a live EDA rulebook.
 - AAP workflow execution only returns simulated steps.
 - No inventory, playbooks, job templates, or infrastructure actions are used.
