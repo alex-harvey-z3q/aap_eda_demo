@@ -28,16 +28,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=os.getenv("AAP_EDA_CLASSIFIER", "openai"),
         help="Classifier implementation to use. Defaults to AAP_EDA_CLASSIFIER or 'openai'.",
     )
-    parser.add_argument(
-        "--model",
-        default=os.getenv("OPENAI_MODEL"),
-        help=("OpenAI model to use. Defaults to OPENAI_MODEL or gpt-5-mini."),
-    )
     args = parser.parse_args(argv)
 
     try:
         payload = _load_payload(args.payload)
-        classifier = _build_classifier(args.classifier, args.model)
+        classifier = _build_classifier(args.classifier)
         result = process_request(payload, classifier=classifier)
     except (OSError, RuntimeError, json.JSONDecodeError, ValueError) as exc:
         print(json.dumps({"status": "error", "message": str(exc)}, indent=2), file=sys.stderr)
@@ -56,7 +51,7 @@ def _load_payload(path: str | None) -> dict[str, Any]:
     return payload
 
 
-def _build_classifier(name: str, model: str | None) -> RequestClassifier:
+def _build_classifier(name: str) -> RequestClassifier:
     if name == "openai":
-        return OpenAIClassifier(model=model)
+        return OpenAIClassifier()
     return RuleBasedClassifier()

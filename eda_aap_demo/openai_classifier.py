@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any, cast
 
 from eda_aap_demo.classifiers import RequestClassifier, RuleBasedClassifier
@@ -71,11 +70,10 @@ class OpenAIClassifier(RequestClassifier):
 
     def __init__(
         self,
-        model: str | None = None,
         client: Any | None = None,
         fallback: RequestClassifier | None = None,
     ) -> None:
-        self.model = model or os.getenv("OPENAI_MODEL", "gpt-5-mini")
+        self.model = "gpt-5-mini"
         self.client = client or self._build_client()
         self.fallback = fallback or RuleBasedClassifier()
 

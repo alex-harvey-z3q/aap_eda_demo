@@ -79,10 +79,10 @@ class OpenAIClassifierTests(unittest.TestCase):
             }
         )
 
-        OpenAIClassifier(model="test-model", client=client).classify(make_request())
+        OpenAIClassifier(client=client).classify(make_request())
 
         request = client.responses.last_request
-        self.assertEqual(request["model"], "test-model")
+        self.assertEqual(request["model"], "gpt-5-mini")
         self.assertEqual(request["text"]["format"]["type"], "json_schema")
         self.assertTrue(request["text"]["format"]["strict"])
 

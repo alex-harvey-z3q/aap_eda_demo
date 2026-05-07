@@ -73,20 +73,6 @@ printf '%s\n' '{
 }' | python -m eda_aap_demo
 ```
 
-## Model Selection
-
-The default OpenAI model is `gpt-5-mini`. Override it with either:
-
-```bash
-OPENAI_MODEL=gpt-5.2 python -m eda_aap_demo samples/restart_service.json
-```
-
-or:
-
-```bash
-python -m eda_aap_demo --model gpt-5.2 samples/restart_service.json
-```
-
 For offline development, the deterministic classifier can still be selected explicitly:
 
 ```bash
