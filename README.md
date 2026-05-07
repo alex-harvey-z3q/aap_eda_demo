@@ -17,6 +17,17 @@ A local Python project for routing operational request payloads into Event-Drive
 +------------------+      +----------------------+      +----------------------+
 ```
 
+Diagram entry points:
+
+| Diagram box | Code entry point |
+| --- | --- |
+| Mock ticket JSON | [`samples/restart_service.json`](samples/restart_service.json) |
+| Request classifier | [`eda_aap_demo/openai_classifier.py`](eda_aap_demo/openai_classifier.py) |
+| Structured intent | [`eda_aap_demo/models.py`](eda_aap_demo/models.py) |
+| EDA-style router | [`eda_aap_demo/router.py`](eda_aap_demo/router.py) |
+| Mock AAP workflow | [`eda_aap_demo/workflows.py`](eda_aap_demo/workflows.py) |
+| JSON result | [`eda_aap_demo/pipeline.py`](eda_aap_demo/pipeline.py) |
+
 Project layout:
 
 - `eda_aap_demo/classifiers.py` contains the classifier abstraction and deterministic rule-based fallback.
