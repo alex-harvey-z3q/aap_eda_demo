@@ -2,17 +2,24 @@ PYTHON ?= python
 PIP ?= $(PYTHON) -m pip
 SRC := eda_aap_demo
 TESTS := tests
+CONTROLLER_ARGS ?=
 
-.PHONY: help install install-dev format format-check lint typecheck security test compile quality clean
+.PHONY: help install install-dev install-eda run-eda format format-check lint typecheck security test compile quality clean
 
 help:
-	@echo "Targets: install install-dev format format-check lint typecheck security test compile quality clean"
+	@echo "Targets: install install-dev install-eda run-eda format format-check lint typecheck security test compile quality clean"
 
 install:
 	$(PIP) install -r requirements.txt
 
 install-dev: install
 	$(PIP) install -r requirements-dev.txt
+
+install-eda:
+	$(PIP) install -r requirements-eda.txt
+
+run-eda:
+	ansible-rulebook --rulebook rulebooks/route_operational_requests.yml -i localhost, $(CONTROLLER_ARGS)
 
 format:
 	$(PYTHON) -m ruff format $(SRC) $(TESTS)

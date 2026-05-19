@@ -1,0 +1,14 @@
+{
+  "schema_version": "aap_eda_poc.v1",
+  "request_id": "REQ-0001",
+  "source": "mock_ticket",
+  "request_text": "Restart the foo service in the bar environment",
+  "environment": "bar",
+  "application": "foo",
+  "requested_by": "test.user@example.com",
+  "priority": "low",
+  "intent": "restart_service",
+  "action": "restart",
+  "confidence": 0.95,
+  "risk_signals": []
+}

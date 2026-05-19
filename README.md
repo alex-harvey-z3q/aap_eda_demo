@@ -1,119 +1,158 @@
 # EDA/AAP Request Routing
 
-A local Python project for routing operational request payloads into Event-Driven Ansible/AAP-style workflows.
+This project demonstrates a pattern for AI-assisted automation:
+
+```text
+ServiceNow/mock ticket
+  -> Python OpenAI classifier
+  -> classified event
+  -> Event-Driven Ansible rulebook as governance gate
+  -> AAP job template/workflow
+```
+
+The Python layer classifies and enriches the request. Event-Driven Ansible applies
+deterministic policy. AAP executes the workflow that passes that policy.
+
+```text
+OpenAI/Python: "This looks like a restart request for foo in prod."
+EDA rulebook:  "Prod restart requires approval, so do not run restart yet."
+AAP:           "Run the approved automation."
+```
 
 ## Architecture
 
 ```text
 +------------------+      +----------------------+      +----------------------+
-| Mock ticket JSON | ---> | Request classifier   | ---> | Structured intent    |
-|                  |      | OpenAI classifier    |      | intent/action        |
+| Mock ticket JSON | ---> | Python classifier    | ---> | Classified EDA event |
+| ServiceNow shape |      | OpenAI or rule       |      | intent/risk/context  |
 +------------------+      +----------------------+      +----------+-----------+
                                                                  |
                                                                  v
 +------------------+      +----------------------+      +----------------------+
-| JSON result      | <--- | Mock AAP workflow    | <--- | EDA-style router     |
-| status + steps   |      | simulated handlers   |      | workflow selection   |
+| AAP workflow/job | <--- | EDA governance gate  | <--- | ansible-rulebook     |
+| template launch  |      | approve/route/review |      | webhook + rules      |
 +------------------+      +----------------------+      +----------------------+
 ```
 
-Diagram entry points:
-
-| Diagram box | Code entry point |
+| Layer | Local implementation |
 | --- | --- |
-| Mock ticket JSON | [`samples/restart_service.json`](samples/restart_service.json) |
-| Request classifier | [`eda_aap_demo/openai_classifier.py`](eda_aap_demo/openai_classifier.py) |
-| Structured intent | [`eda_aap_demo/models.py`](eda_aap_demo/models.py) |
-| EDA-style router | [`eda_aap_demo/router.py`](eda_aap_demo/router.py) |
-| Mock AAP workflow | [`eda_aap_demo/workflows.py`](eda_aap_demo/workflows.py) |
-| JSON result | [`eda_aap_demo/pipeline.py`](eda_aap_demo/pipeline.py) |
+| Mock ServiceNow ticket | [`samples/restart_service.json`](samples/restart_service.json) |
+| OpenAI/rule classifier | [`eda_aap_demo/openai_classifier.py`](eda_aap_demo/openai_classifier.py), [`eda_aap_demo/classifiers.py`](eda_aap_demo/classifiers.py) |
+| Classified event builder | [`eda_aap_demo/eda_event.py`](eda_aap_demo/eda_event.py) |
+| EDA governance rulebook | [`rulebooks/route_operational_requests.yml`](rulebooks/route_operational_requests.yml) |
+| AAP launch action | `run_job_template` actions in the rulebook |
+| Legacy local simulation | [`eda_aap_demo/router.py`](eda_aap_demo/router.py), [`eda_aap_demo/workflows.py`](eda_aap_demo/workflows.py), [`eda_aap_demo/pipeline.py`](eda_aap_demo/pipeline.py) |
 
-Project layout:
+## EDA
 
-- `eda_aap_demo/classifiers.py` contains the classifier abstraction and deterministic rule-based fallback.
-- `eda_aap_demo/openai_classifier.py` contains the OpenAI-backed classifier used by the CLI.
-- `eda_aap_demo/router.py` contains EDA-style routing rules.
-- `eda_aap_demo/workflows.py` contains mock AAP workflow handlers.
-- `eda_aap_demo/pipeline.py` wires the flow together.
-- `eda_aap_demo/cli.py` provides the command-line entry point.
-- `tests/` covers classification and routing behavior.
+EDA is the governance gate between AI classification and automation execution.
+It owns the final decision:
 
-## Platform Mapping
+- unknown intent -> manual review
+- low classifier confidence -> manual review
+- protected environment such as `prod` or `production` -> approval workflow
+- urgent/high/critical priority -> approval workflow
+- known low-risk request -> launch matching AAP job template
 
-In a platform implementation, a ServiceNow ticket or service request can emit an event containing request details. Event-Driven Ansible evaluates rulebooks against that event, selects an automation target, and invokes an AAP job template or workflow.
+That keeps the AI service from becoming the authority that launches automation.
+The classifier produces a signal; the rulebook enforces policy.
 
-This project uses the following local equivalents:
+## Classified Event Contract
 
-| Real-world concept | Local component |
-| --- | --- |
-| ServiceNow ticket | Mock JSON payload |
-| Request classification | OpenAI-backed classifier |
-| Structured operational intent | `ClassifiedIntent` |
-| EDA rulebook routing | `EdaRouter` |
-| AAP workflow/job template | Mock workflow handlers |
-| Job output | JSON result printed by CLI |
+Example:
 
-## Run Locally
-
-Requires Python 3.10+.
-
-Install dependencies and set an OpenAI API key:
-
-```bash
-python -m pip install -r requirements.txt
-export OPENAI_API_KEY="your-api-key"
-```
-
-Run with the included sample payload:
-
-```bash
-python -m eda_aap_demo samples/restart_service.json
-```
-
-Or pipe JSON via stdin:
-
-```bash
-printf '%s\n' '{
+```json
+{
+  "schema_version": "aap_eda_poc.v1",
   "request_id": "REQ-0001",
   "source": "mock_ticket",
   "request_text": "Restart the foo service in the bar environment",
   "environment": "bar",
   "application": "foo",
   "requested_by": "test.user@example.com",
-  "priority": "low"
-}' | python -m eda_aap_demo
+  "priority": "low",
+  "intent": "restart_service",
+  "action": "restart",
+  "confidence": 0.95,
+  "risk_signals": []
+}
 ```
 
-For offline development, the deterministic classifier can still be selected explicitly:
+## Run Locally
+
+Requires Python 3.10+.
+
+Install Python dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+For OpenAI classification, set an API key:
+
+```bash
+export OPENAI_API_KEY="your-api-key"
+```
+
+Run the original local-only simulation:
+
+```bash
+python -m eda_aap_demo samples/restart_service.json
+```
+
+For offline development, use the deterministic classifier:
 
 ```bash
 python -m eda_aap_demo --classifier rule samples/restart_service.json
 ```
 
-Example output:
-
-```json
-{
-  "request_id": "REQ-0001",
-  "classified_intent": "restart_service",
-  "confidence": 0.95,
-  "requires_approval": false,
-  "selected_workflow": "aap_restart_service",
-  "simulated_workflow_steps": [
-    "Validate application 'foo' in environment 'bar'",
-    "Check mock maintenance window",
-    "Simulate restarting service",
-    "Simulate post-restart status check"
-  ],
-  "final_status": "completed"
-}
-```
-
-## Run Tests
+Emit the classified event that the EDA rulebook expects:
 
 ```bash
-python -m unittest discover
+python -m eda_aap_demo --classifier rule --emit-eda-event samples/restart_service.json
 ```
+
+## Run With Event-Driven Ansible
+
+Install the EDA dependency:
+
+```bash
+make install-eda
+```
+
+Start the rulebook webhook listener. For real AAP execution, pass controller
+connection details:
+
+```bash
+make run-eda CONTROLLER_ARGS="--controller-url https://controller.example.com --controller-token $AAP_TOKEN"
+```
+
+In another terminal, classify and POST the sample request into EDA:
+
+```bash
+python -m eda_aap_demo \
+  --classifier rule \
+  --post-eda-webhook http://127.0.0.1:5000/endpoint \
+  samples/restart_service.json
+```
+
+The rulebook receives the POST body under `event.payload`, evaluates the
+classified intent and governance fields, then chooses manual review, approval,
+or direct AAP workflow launch.
+
+The referenced AAP job templates must exist in the `Default` organization, and
+they need Prompt on Launch for variables if they should receive the event fields
+as extra vars.
+
+## Project Layout
+
+- `eda_aap_demo/cli.py` provides the command-line entry point.
+- `eda_aap_demo/openai_classifier.py` uses OpenAI structured output for intent classification.
+- `eda_aap_demo/classifiers.py` provides the deterministic rule classifier.
+- `eda_aap_demo/eda_event.py` builds and posts EDA event payloads.
+- `rulebooks/route_operational_requests.yml` contains the real EDA governance rules.
+- `samples/` contains mock ticket and classified event examples.
+- `tests/` covers classification, routing, and the EDA event contract.
 
 ## Quality Gates
 
@@ -123,7 +162,7 @@ Install development dependencies:
 make install-dev
 ```
 
-Run all local quality gates:
+Run all local checks:
 
 ```bash
 make quality
@@ -139,32 +178,25 @@ make security
 make test
 ```
 
-## Local Boundaries
+## Mocks
 
-External systems and infrastructure actions are not called:
+External systems and infrastructure actions are not called by default:
 
-- Ticket source is local JSON, not ServiceNow.
-- Request classification uses OpenAI by default.
-- The deterministic rule classifier is available for offline development with `--classifier rule`.
-- EDA routing is plain Python rules, not a live EDA rulebook.
-- AAP workflow execution only returns simulated steps.
-- No inventory, playbooks, job templates, or infrastructure actions are used.
+- The ticket source is local JSON, not ServiceNow.
+- OpenAI classifies intent but does not choose the final workflow in the EDA path.
+- The deterministic classifier is available with `--classifier rule`.
+- The EDA rulebook owns manual-review, approval, and workflow-routing policy.
+- The rulebook only launches real AAP templates when run with controller credentials.
+- No inventory, playbooks, job templates, or infrastructure actions are included in this repo.
 
 ## Production Considerations
 
-For a production implementation, add:
+For a production implementation, you would add:
 
-- A real event source such as ServiceNow webhooks or an integration middleware.
-- Authentication, authorization, audit logging, and approval gates.
-- An EDA deployment with tested rulebooks and event schemas.
-- AAP workflow/job template integration using supported APIs.
-- Inventory scoping, RBAC, credential management, and environment guardrails.
-- Robust intent extraction with validation, fallback paths, model evaluation, and prompt/version governance.
-- Human-in-the-loop review for high-risk or low-confidence requests.
-- Observability, retries, idempotency controls, and incident traceability.
-
-## OpenAI Classifier
-
-`RequestClassifier` is the shared interface for both classifier implementations. `OpenAIClassifier` uses the OpenAI Responses API with Structured Outputs so the model response is constrained to the same structured intent fields used by the rest of the pipeline.
-
-The OpenAI classifier only selects structured intent for the local workflow router. It does not call ServiceNow, EDA, AAP, or infrastructure.
+- a real event source such as ServiceNow webhooks or integration middleware
+- authentication, authorization, audit logging, and approval gates
+- tested EDA rulebooks and event schemas
+- AAP workflow/job template integration using supported controller APIs
+- inventory scoping, RBAC, credential management, and environment guardrails
+- classifier evaluation, prompt/version governance, and fallback paths
+- observability, retries, idempotency controls, and incident traceability

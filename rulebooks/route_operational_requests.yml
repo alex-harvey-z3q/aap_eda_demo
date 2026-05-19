@@ -1,0 +1,161 @@
+---
+- name: Govern classified operational requests before AAP workflow launch
+  hosts: localhost
+
+  sources:
+    - name: classified_request_webhook
+      eda.builtin.webhook:
+        host: 0.0.0.0
+        port: 5000
+
+  rules:
+    - name: Send unknown requests to manual review
+      condition: event.payload.intent == "unknown_request"
+      action:
+        run_job_template:
+          name: Manual Review
+          organization: Default
+          job_args:
+            extra_vars:
+              request_id: "{{ event.payload.request_id }}"
+              request_text: "{{ event.payload.request_text }}"
+              requested_by: "{{ event.payload.requested_by }}"
+              reason: "Unknown or unsupported request intent"
+
+    - name: Send low confidence classifications to manual review
+      condition: >
+        event.payload.intent != "unknown_request" and
+        event.payload.confidence < 0.85
+      action:
+        run_job_template:
+          name: Manual Review
+          organization: Default
+          job_args:
+            extra_vars:
+              request_id: "{{ event.payload.request_id }}"
+              intent: "{{ event.payload.intent }}"
+              confidence: "{{ event.payload.confidence }}"
+              request_text: "{{ event.payload.request_text }}"
+              reason: "Classifier confidence below automation threshold"
+
+    - name: Require approval for protected environments
+      condition: >
+        event.payload.confidence >= 0.85 and
+        (
+          event.payload.environment == "prod" or
+          event.payload.environment == "production"
+        )
+      action:
+        run_job_template:
+          name: Create Approval Task
+          organization: Default
+          job_args:
+            extra_vars:
+              request_id: "{{ event.payload.request_id }}"
+              intent: "{{ event.payload.intent }}"
+              application: "{{ event.payload.application }}"
+              environment: "{{ event.payload.environment }}"
+              requested_by: "{{ event.payload.requested_by }}"
+              priority: "{{ event.payload.priority }}"
+              reason: "Protected environment requires approval"
+
+    - name: Require approval for high priority requests
+      condition: >
+        event.payload.confidence >= 0.85 and
+        event.payload.environment != "prod" and
+        event.payload.environment != "production" and
+        (
+          event.payload.priority == "high" or
+          event.payload.priority == "critical" or
+          event.payload.priority == "urgent"
+        )
+      action:
+        run_job_template:
+          name: Create Approval Task
+          organization: Default
+          job_args:
+            extra_vars:
+              request_id: "{{ event.payload.request_id }}"
+              intent: "{{ event.payload.intent }}"
+              application: "{{ event.payload.application }}"
+              environment: "{{ event.payload.environment }}"
+              requested_by: "{{ event.payload.requested_by }}"
+              priority: "{{ event.payload.priority }}"
+              reason: "High priority request requires approval"
+
+    - name: Restart service
+      condition: >
+        event.payload.intent == "restart_service" and
+        event.payload.confidence >= 0.85 and
+        event.payload.environment != "prod" and
+        event.payload.environment != "production" and
+        event.payload.priority != "high" and
+        event.payload.priority != "critical" and
+        event.payload.priority != "urgent"
+      action:
+        run_job_template:
+          name: AAP Restart Service
+          organization: Default
+          job_args:
+            extra_vars:
+              request_id: "{{ event.payload.request_id }}"
+              application: "{{ event.payload.application }}"
+              environment: "{{ event.payload.environment }}"
+              requested_by: "{{ event.payload.requested_by }}"
+
+    - name: Check service status
+      condition: >
+        event.payload.intent == "check_service_status" and
+        event.payload.confidence >= 0.85 and
+        event.payload.environment != "prod" and
+        event.payload.environment != "production" and
+        event.payload.priority != "high" and
+        event.payload.priority != "critical" and
+        event.payload.priority != "urgent"
+      action:
+        run_job_template:
+          name: AAP Check Service Status
+          organization: Default
+          job_args:
+            extra_vars:
+              request_id: "{{ event.payload.request_id }}"
+              application: "{{ event.payload.application }}"
+              environment: "{{ event.payload.environment }}"
+
+    - name: Collect logs
+      condition: >
+        event.payload.intent == "collect_logs" and
+        event.payload.confidence >= 0.85 and
+        event.payload.environment != "prod" and
+        event.payload.environment != "production" and
+        event.payload.priority != "high" and
+        event.payload.priority != "critical" and
+        event.payload.priority != "urgent"
+      action:
+        run_job_template:
+          name: AAP Collect Logs
+          organization: Default
+          job_args:
+            extra_vars:
+              request_id: "{{ event.payload.request_id }}"
+              application: "{{ event.payload.application }}"
+              environment: "{{ event.payload.environment }}"
+
+    - name: Run health check
+      condition: >
+        event.payload.intent == "run_health_check" and
+        event.payload.confidence >= 0.85 and
+        event.payload.environment != "prod" and
+        event.payload.environment != "production" and
+        event.payload.priority != "high" and
+        event.payload.priority != "critical" and
+        event.payload.priority != "urgent"
+      action:
+        run_job_template:
+          name: AAP Run Health Check
+          organization: Default
+          job_args:
+            extra_vars:
+              request_id: "{{ event.payload.request_id }}"
+              application: "{{ event.payload.application }}"
+              environment: "{{ event.payload.environment }}"
